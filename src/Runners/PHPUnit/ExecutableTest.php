@@ -188,8 +188,7 @@ abstract class ExecutableTest
     {
         $environmentVariables['PARATEST'] = 1;
         $this->handleEnvironmentVariables($environmentVariables);
-        $finder = new PhpExecutableFinder();
-        $command = $finder->find() . ' ' . $this->command($binary, $options);
+        $command = $this->executable($options) . ' ' . $this->command($binary, $options);
         $this->assertValidCommandLineLength($command);
         $this->lastCommand = $command;
         $this->process = new Process($command, null, $environmentVariables);
@@ -212,6 +211,23 @@ abstract class ExecutableTest
     }
 
     /**
+     * Generate the executable used to to handle through paratest
+     * 
+     * @param array  $options command line options
+     * @return string executable
+     */
+    public function executable(array $options) : string
+    {
+        if (isset($options['php-executable'])) {
+            return $options['php-executable'];
+        }
+
+        $finder = new PhpExecutableFinder();
+        return $finder->find();
+    }
+    
+
+    /**
      * Generate command line with passed options suitable to handle through paratest.
      *
      * @param string $binary  executable binary name
@@ -223,7 +239,8 @@ abstract class ExecutableTest
     {
         $options = array_merge($this->prepareOptions($options), ['log-junit' => $this->getTempFile()]);
         $options = $this->redirectCoverageOption($options);
-
+        $options = $this->removeExecutableOption($options);
+        
         return $this->getCommandString($binary, $options);
     }
 
@@ -355,6 +372,23 @@ abstract class ExecutableTest
         }
 
         unset($options['coverage-html'], $options['coverage-clover'], $options['coverage-text']);
+
+        return $options;
+    }
+    
+    /**
+     * Checks if the php-executable option is set and removes it to a unique temp file.
+     * This will ensure, that multiple tests write to separate coverage-files.
+     *
+     * @param array $options
+     *
+     * @return array $options
+     */
+    protected function removeExecutableOption(array $options): array
+    {
+        if (isset($options['php-executable'])) {
+            unset($options['php-executable']);
+        }
 
         return $options;
     }
