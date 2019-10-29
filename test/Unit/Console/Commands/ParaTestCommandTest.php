@@ -185,6 +185,12 @@ class ParaTestCommandTest extends \ParaTest\Tests\TestBase
                 InputOption::VALUE_REQUIRED,
                 'Directory to add to the coverage whitelist.'
             ),
+            new InputOption(
+                'php-executable',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Path to php executable.'
+            ),
         ];
         $expected = new InputDefinition($options);
         $definition = $this->command->getDefinition();
