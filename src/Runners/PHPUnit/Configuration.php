@@ -100,6 +100,25 @@ class Configuration
         return $suites;
     }
 
+    public function hasSuites()
+    {
+        return !empty($this->getSuitesName());
+    }
+
+    public function getSuitesName()
+    {
+        if (!$this->xml) {
+            return;
+        }
+        $nodes = $this->xml->xpath('//testsuites/testsuite');
+        $names = [];
+        foreach ($nodes as $node) {
+            $names[] = (string) $node['name'];
+        }
+
+        return $names;
+    }
+
     /**
      * Return the contents of the <testsuite> nodes
      * contained in a PHPUnit configuration.
@@ -130,7 +149,7 @@ class Configuration
                             // Replicate behaviour of PHPUnit
                             // if a directory is included and excluded at the same time, then it is considered included
                             foreach ($this->getSuitePaths((string) $nodeContent) as $dir) {
-                                if (array_key_exists($dir, $excludedPaths)) {
+                                if (\array_key_exists($dir, $excludedPaths)) {
                                     unset($excludedPaths[$dir]);
                                 }
                             }
@@ -160,7 +179,7 @@ class Configuration
      */
     public function getConfigDir(): string
     {
-        return dirname($this->path) . DIRECTORY_SEPARATOR;
+        return \dirname($this->path) . \DIRECTORY_SEPARATOR;
     }
 
     /**
@@ -190,6 +209,26 @@ class Configuration
         }
 
         throw new \RuntimeException("Suite path $path could not be found");
+    }
+
+    /**
+     * Get override environment variables from phpunit config file.
+     *
+     * @return array
+     */
+    public function getEnvironmentVariables(): array
+    {
+        if (!isset($this->xml->php->env)) {
+            return [];
+        }
+
+        $variables = [];
+
+        foreach ($this->xml->php->env as $env) {
+            $variables[(string) $env['name']] = (string) $env['value'];
+        }
+
+        return $variables;
     }
 
     /**

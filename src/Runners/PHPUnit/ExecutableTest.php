@@ -53,7 +53,7 @@ abstract class ExecutableTest
      */
     protected $lastCommand = '';
 
-    public function __construct(string $path, string $fullyQualifiedClassName = null)
+    public function __construct(string $path, ?string $fullyQualifiedClassName = null)
     {
         $this->path = $path;
         $this->fullyQualifiedClassName = $fullyQualifiedClassName;
@@ -100,29 +100,6 @@ abstract class ExecutableTest
     public function getStderr(): string
     {
         return $this->process->getErrorOutput();
-    }
-
-    /**
-     * Return any warnings that are in the test output, or false if there are none.
-     *
-     * @return mixed
-     */
-    public function getWarnings()
-    {
-        if (!$this->process) {
-            return false;
-        }
-
-        // PHPUnit has a bug where by it doesn't include warnings in the junit
-        // output, but still fails. This is a hacky, imperfect method for extracting them
-        // see https://github.com/sebastianbergmann/phpunit/issues/1317
-        preg_match_all(
-            '/^\d+\) Warning\n(.+?)$/ms',
-            $this->process->getOutput(),
-            $matches
-        );
-
-        return $matches[1] ?? false;
     }
 
     /**
@@ -176,28 +153,83 @@ abstract class ExecutableTest
     }
 
     /**
+     * Set the last process command.
+     *
+     * @param string $command
+     */
+    public function setLastCommand(string $command)
+    {
+        $this->lastCommand = $command;
+    }
+
+    /**
      * Executes the test by creating a separate process.
      *
-     * @param $binary
-     * @param array $options
-     * @param array $environmentVariables
+     * @param string      $binary
+     * @param array       $options
+     * @param array       $environmentVariables
+     * @param string|null $passthru
+     * @param string|null $passthruPhp
      *
      * @return $this
      */
-    public function run(string $binary, array $options = [], array $environmentVariables = [])
-    {
+    public function run(
+        string $binary,
+        array $options = [],
+        array $environmentVariables = [],
+        ?string $passthru = null,
+        ?string $passthruPhp = null
+    ) {
         $environmentVariables['PARATEST'] = 1;
         $this->handleEnvironmentVariables($environmentVariables);
-        $command = $this->executable($options) . ' ' . $this->command($binary, $options);
+
+        $command = $this->getFullCommandlineString($binary, $options, $passthru, $passthruPhp);
+
         $this->assertValidCommandLineLength($command);
-        $this->lastCommand = $command;
-        $this->process = new Process($command, null, $environmentVariables);
+        $this->setLastCommand($command);
+
+        $this->process = method_exists(Process::class, 'fromShellCommandline') ?
+            Process::fromShellCommandline($command, null, $environmentVariables) :
+            new Process($command, null, $environmentVariables);
+
         if (method_exists($this->process, 'inheritEnvironmentVariables')) {
-            $this->process->inheritEnvironmentVariables();  // no such method in 3.0, but emits warning if this isn't done in 3.3
+            // no such method in 3.0, but emits warning if this isn't done in 3.3
+            $this->process->inheritEnvironmentVariables();
         }
         $this->process->start();
 
         return $this;
+    }
+
+    /**
+     * Build the full executable as we would do on the command line, e.g.
+     * php -d zend_extension=xdebug.so vendor/bin/phpunit --teststuite suite1 --prepend xdebug-filter.php.
+     *
+     * @param $binary
+     * @param $options
+     * @param string|null $passthru
+     * @param string|null $passthruPhp
+     *
+     * @return string
+     */
+    protected function getFullCommandlineString(
+        $binary,
+        $options,
+        ?string $passthru = null,
+        ?string $passthruPhp = null
+    ) {
+        $finder = new PhpExecutableFinder();
+        $args = [];
+
+        $args['php'] = $finder->find();
+        if (!empty($passthruPhp)) {
+            $args['phpOptions'] = $passthruPhp;
+        }
+        $args['phpunit'] = $this->command($binary, $options, $passthru);
+
+        $command = implode(' ', $args);
+
+        return $command;
     }
 
     /**
@@ -230,22 +262,25 @@ abstract class ExecutableTest
     /**
      * Generate command line with passed options suitable to handle through paratest.
      *
-     * @param string $binary  executable binary name
-     * @param array  $options command line options
+     * @param string      $binary   executable binary name
+     * @param array       $options  command line options
+     * @param string|null $passthru
      *
      * @return string command line
      */
-    public function command(string $binary, array $options = []): string
+    public function command(string $binary, array $options = [], ?string $passthru = null): string
     {
         $options = array_merge($this->prepareOptions($options), ['log-junit' => $this->getTempFile()]);
         $options = $this->redirectCoverageOption($options);
         $options = $this->removeExecutableOption($options);
         
-        return $this->getCommandString($binary, $options);
+        $cmd = $this->getCommandString($binary, $options, $passthru);
+
+        return $cmd;
     }
 
     /**
-     * Get covertage filename.
+     * Get coverage filename.
      *
      * @return string
      */
@@ -269,7 +304,7 @@ abstract class ExecutableTest
     }
 
     /**
-     * Set process termporary filename.
+     * Set process temporary filename.
      *
      * @param string $temp
      */
@@ -279,7 +314,7 @@ abstract class ExecutableTest
     }
 
     /**
-     * Assert that command line lenght is valid.
+     * Assert that command line length is valid.
      *
      * In some situations process command line can became too long when combining different test
      * cases in single --filter arguments so it's better to show error regarding that to user
@@ -291,10 +326,10 @@ abstract class ExecutableTest
      */
     protected function assertValidCommandLineLength(string $cmd)
     {
-        if (DIRECTORY_SEPARATOR === '\\') { // windows
+        if (\DIRECTORY_SEPARATOR === '\\') { // windows
             // symfony's process wrapper
             $cmd = 'cmd /V:ON /E:ON /C "(' . $cmd . ')';
-            if (strlen($cmd) > 32767) {
+            if (\strlen($cmd) > 32767) {
                 throw new \RuntimeException('Command line is too long, try to decrease max batch size');
             }
         }
@@ -322,15 +357,31 @@ abstract class ExecutableTest
      * Returns the command string that will be executed
      * by proc_open.
      *
-     * @param string $binary
-     * @param array  $options
+     * @param string      $binary
+     * @param array       $options
+     * @param string|null $passthru
      *
      * @return mixed
      */
-    protected function getCommandString(string $binary, array $options = [])
+    protected function getCommandString(string $binary, array $options = [], ?string $passthru = null)
     {
         // The order we add stuff into $arguments is important
         $arguments = [$binary];
+        // Note:
+        // the arguments MUST come last and we need to "somehow"
+        // merge the passthru string in there.
+        // Thus, we "split" the command creation here.
+        // For a clean solution, we would need to manually parse and verify
+        // the passthru. I'll leave that as a
+        // TODO
+        // @see https://stackoverflow.com/a/34871367/413531
+        // @see https://github.com/symfony/console/blob/68001d4b65139ef4f22da581a8da7be714218aec/Input/StringInput.php
+        $cmd = (new Process($arguments))->getCommandLine();
+        if (!empty($passthru)) {
+            $cmd .= ' ' . $passthru;
+        }
+
+        $arguments = [];
         foreach ($options as $key => $value) {
             $arguments[] = "--$key";
             if ($value !== null) {
@@ -341,7 +392,9 @@ abstract class ExecutableTest
         $arguments[] = $this->fullyQualifiedClassName ?? '';
         $arguments[] = $this->getPath();
 
-        return (new Process($arguments))->getCommandLine();
+        $args = (new Process($arguments))->getCommandLine();
+
+        return $cmd . ' ' . $args;
     }
 
     /**

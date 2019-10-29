@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace ParaTest\Runners\PHPUnit;
 
 /**
- * Class Options.
- *
  * An object containing all configurable information used
- * to run PHPUnit via ParaTest
+ * to run PHPUnit via ParaTest.
  */
 class Options
 {
@@ -76,7 +74,7 @@ class Options
     /**
      * Filters which tests to run.
      *
-     * @var string|null
+     * @var string[]
      */
     protected $testsuite;
 
@@ -108,10 +106,52 @@ class Options
      */
     protected $annotations = [];
 
+    /**
+     * Running the suite defined in the config in parallel.
+     *
+     * @var bool
+     */
+    protected $parallelSuite;
+
+    /**
+     * Strings that gets passed verbatim to the underlying phpunit command.
+     *
+     * @var string|null
+     */
+    protected $passthru;
+
+    /**
+     * Strings that gets passed verbatim to the underlying php process.
+     *
+     * @var string|null
+     */
+    protected $passthruPhp;
+
+    /**
+     * Verbosity. If true, debug output will be printed.
+     *
+     * @var int
+     */
+    protected $verbose;
+
+    /**
+     * Limit the number of tests recorded in coverage reports
+     * to avoid them growing too big.
+     *
+     * @var int
+     */
+    protected $coverageTestLimit;
+
     public function __construct(array $opts = [])
     {
         foreach (self::defaults() as $opt => $value) {
             $opts[$opt] = $opts[$opt] ?? $value;
+        }
+
+        if ($opts['processes'] === 'auto') {
+            $opts['processes'] = self::getNumberOfCPUCores();
+        } elseif ($opts['processes'] === 'half') {
+            $opts['processes'] = intdiv(self::getNumberOfCPUCores(), 2);
         }
 
         $this->processes = $opts['processes'];
@@ -125,6 +165,11 @@ class Options
         $this->testsuite = $opts['testsuite'];
         $this->maxBatchSize = (int) $opts['max-batch-size'];
         $this->filter = $opts['filter'];
+        $this->parallelSuite = $opts['parallel-suite'];
+        $this->passthru = $opts['passthru'] ?? null;
+        $this->passthruPhp = $opts['passthru-php'] ?? null;
+        $this->verbose = $opts['verbose'] ?? 0;
+        $this->coverageTestLimit = $opts['coverage-test-limit'] ?? 0;
 
         // we need to register that options if they are blank but do not get them as
         // key with null value in $this->filtered as it will create problems for
@@ -132,13 +177,13 @@ class Options
         // and it's wrong because group and exclude-group options require value when passed
         // to phpunit)
         $this->groups = isset($opts['group']) && $opts['group'] !== ''
-                      ? explode(',', $opts['group'])
-                      : [];
+            ? explode(',', $opts['group'])
+            : [];
         $this->excludeGroups = isset($opts['exclude-group']) && $opts['exclude-group'] !== ''
-                             ? explode(',', $opts['exclude-group'])
-                             : [];
+            ? explode(',', $opts['exclude-group'])
+            : [];
 
-        if (isset($opts['filter']) && strlen($opts['filter']) > 0 && !$this->functional) {
+        if (isset($opts['filter']) && \strlen($opts['filter']) > 0 && !$this->functional) {
             throw new \RuntimeException('Option --filter is not implemented for non functional mode');
         }
 
@@ -180,7 +225,7 @@ class Options
     protected static function defaults(): array
     {
         return [
-            'processes' => 5,
+            'processes' => 'auto',
             'path' => '',
             'phpunit' => static::phpunit(),
             'functional' => false,
@@ -191,6 +236,11 @@ class Options
             'testsuite' => '',
             'max-batch-size' => 0,
             'filter' => null,
+            'parallel-suite' => false,
+            'passthru' => null,
+            'passthru-php' => null,
+            'verbose' => 0,
+            'coverage-test-limit' => 0
         ];
     }
 
@@ -207,12 +257,9 @@ class Options
     {
         $vendor = static::vendorDir();
 
-        $phpunit = $vendor . DIRECTORY_SEPARATOR . 'bin' . DIRECTORY_SEPARATOR . 'phpunit';
-        $batch = $phpunit . '.bat';
-
-        if (DIRECTORY_SEPARATOR === '\\' && file_exists($batch)) {
-            return $phpunit . '.bat';
-        } elseif (file_exists($phpunit)) {
+        $phpunit = $vendor . \DIRECTORY_SEPARATOR . 'phpunit' . \DIRECTORY_SEPARATOR . 'phpunit' .
+            \DIRECTORY_SEPARATOR . 'phpunit';
+        if (file_exists($phpunit)) {
             return $phpunit;
         }
 
@@ -226,9 +273,9 @@ class Options
      */
     protected static function vendorDir(): string
     {
-        $vendor = dirname(dirname(dirname(__DIR__))) . DIRECTORY_SEPARATOR . 'vendor';
+        $vendor = \dirname(\dirname(\dirname(__DIR__))) . \DIRECTORY_SEPARATOR . 'vendor';
         if (!file_exists($vendor)) {
-            $vendor = dirname(dirname(dirname(dirname(dirname(__DIR__)))));
+            $vendor = \dirname(\dirname(\dirname(\dirname(\dirname(__DIR__)))));
         }
 
         return $vendor;
@@ -252,6 +299,11 @@ class Options
             'testsuite' => $this->testsuite,
             'max-batch-size' => $this->maxBatchSize,
             'filter' => $this->filter,
+            'parallel-suite' => $this->parallelSuite,
+            'passthru' => $this->passthru,
+            'passthru-php' => $this->passthruPhp,
+            'verbose' => $this->verbose,
+            'coverage-test-limit' => $this->coverageTestLimit
         ]);
         if ($configuration = $this->getConfigurationPath($filtered)) {
             $filtered['configuration'] = new Configuration($configuration);
@@ -292,7 +344,7 @@ class Options
             return realpath($path);
         }
 
-        $path = rtrim($path, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+        $path = rtrim($path, \DIRECTORY_SEPARATOR) . \DIRECTORY_SEPARATOR;
         $suffixes = ['phpunit.xml', 'phpunit.xml.dist'];
 
         foreach ($suffixes as $suffix) {
@@ -312,7 +364,7 @@ class Options
     {
         $annotatedOptions = ['group'];
         foreach ($this->filtered as $key => $value) {
-            if (array_search($key, $annotatedOptions, true) !== false) {
+            if (\in_array($key, $annotatedOptions, true)) {
                 $this->annotations[$key] = $value;
             }
         }
@@ -326,5 +378,36 @@ class Options
     private function isFile(string $file): bool
     {
         return file_exists($file) && !is_dir($file);
+    }
+
+    /**
+     * Return number of (logical) CPU cores, use 2 as fallback.
+     *
+     * Used to set number of processes if argument is set to "auto", allows for portable defaults for doc and scripting.
+     *
+     * @internal
+     */
+    public static function getNumberOfCPUCores(): int
+    {
+        $cores = 2;
+        if (is_file('/proc/cpuinfo')) {
+            // Linux (and potentially Windows with linux sub systems)
+            $cpuinfo = file_get_contents('/proc/cpuinfo');
+            preg_match_all('/^processor/m', $cpuinfo, $matches);
+            $cores = \count($matches[0]);
+        } elseif (\DIRECTORY_SEPARATOR === '\\') {
+            // Windows
+            if (($process = @popen('wmic cpu get NumberOfCores', 'rb')) !== false) {
+                fgets($process);
+                $cores = (int) fgets($process);
+                pclose($process);
+            }
+        } elseif (($process = @popen('sysctl -n hw.ncpu', 'rb')) !== false) {
+            // *nix (Linux, BSD and Mac)
+            $cores = (int) fgets($process);
+            pclose($process);
+        }
+
+        return $cores;
     }
 }

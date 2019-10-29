@@ -124,11 +124,11 @@ class LogInterpreter extends MetaProvider
                 $dict[$case->file] = new TestSuite($case->class, 0, 0, 0, 0, 0, 0);
             }
             $dict[$case->file]->cases[] = $case;
-            $dict[$case->file]->tests += 1;
+            ++$dict[$case->file]->tests;
             $dict[$case->file]->assertions += $case->assertions;
-            $dict[$case->file]->failures += count($case->failures);
-            $dict[$case->file]->errors += count($case->errors);
-            $dict[$case->file]->skipped += count($case->skipped);
+            $dict[$case->file]->failures += \count($case->failures);
+            $dict[$case->file]->errors += \count($case->errors);
+            $dict[$case->file]->skipped += \count($case->skipped);
             $dict[$case->file]->time += $case->time;
             $dict[$case->file]->file = $case->file;
         }
@@ -146,8 +146,8 @@ class LogInterpreter extends MetaProvider
     protected function getNumericValue(string $property)
     {
         return ($property === 'time')
-               ? (float) ($this->accumulate('getTotalTime'))
-               : (int) ($this->accumulate('getTotal' . ucfirst($property)));
+               ? (float) $this->accumulate('getTotalTime')
+               : (int) $this->accumulate('getTotal' . ucfirst($property));
     }
 
     /**

@@ -2,15 +2,12 @@ ParaTest
 ========
 
 [![Build Status](https://travis-ci.org/paratestphp/paratest.svg?branch=master)](https://travis-ci.org/paratestphp/paratest)
-[![Code Coverage](https://scrutinizer-ci.com/g/brianium/paratest/badges/coverage.png?b=master)](https://scrutinizer-ci.com/g/brianium/paratest/?branch=master)
-[![Scrutinizer Code Quality](https://scrutinizer-ci.com/g/brianium/paratest/badges/quality-score.png?b=master)](https://scrutinizer-ci.com/g/brianium/paratest/?branch=master)
 [![Packagist](https://img.shields.io/packagist/dt/brianium/paratest.svg)](https://packagist.org/packages/brianium/paratest)
 
 The objective of ParaTest is to support parallel testing in PHPUnit. Provided you have well-written PHPUnit tests, you can drop `paratest` in your project and
 start using it with no additional bootstrap or configurations!
 
-Benefits
-------------
+# Benefits
 
 Why use `paratest` over the alternative parallel test runners out there?
 
@@ -18,64 +15,72 @@ Why use `paratest` over the alternative parallel test runners out there?
 * Zero configuration. *After composer install, run with `vendor/bin/paratest -p4 path/to/tests`. That's it!*
 * Flexible. *Isolate test files in separate processes or take advantage of WrapperRunner for even faster runs.*
 
-Installation
-------------
-
-### Composer ###
+# Installation
 
 To install with composer run the following command:
 
     composer require --dev brianium/paratest
     
-Versions
-------------
-For PHPUnit >= 7: Please use Paratest v2+
+# Versions
 
-For PHPUnit <= 6: Please use Paratest v1.
+| PHPUnit Version  | Corresponding Paratest Version |
+| ------------- | ------------- |
+| <= 6.* | 1.* |
+| 7.* | 2.* |
+| 8.* | 3.* |
 
-Usage
------
+# Usage
 
 After installation, the binary can be found at `vendor/bin/paratest`. Usage is as follows:
 
 ```
 Usage:
- paratest [-p|--processes="..."] [-f|--functional] [--no-test-tokens] [-h|--help] [--coverage-clover="..."] [--coverage-html="..."] [--coverage-php="..."] [-m|--max-batch-size="..."] [--filter="..."] [--phpunit="..."] [--runner="..."] [--bootstrap="..."] [-c|--configuration="..."] [-g|--group="..."] [--exclude-group="..."] [--stop-on-failure] [--log-junit="..."] [--colors] [--testsuite[="..."]] [--path="..."] [path]
+ paratest [-p|--processes PROCESSES] [-f|--functional] [--no-test-tokens] [-h|--help] [--coverage-clover COVERAGE-CLOVER] [--coverage-html COVERAGE-HTML] [--coverage-php COVERAGE-PHP] [--coverage-text] [--coverage-xml COVERAGE-XML] [-m|--max-batch-size MAX-BATCH-SIZE] [--filter FILTER] [--parallel-suite] [--passthru PASSTHRU] [--passthru-php PASSTHRU-PHP] [-v|--verbose VERBOSE] [--whitelist WHITELIST] [--phpunit PHPUNIT] [--runner RUNNER] [--bootstrap BOOTSTRAP] [-c|--configuration CONFIGURATION] [-g|--group GROUP] [--exclude-group EXCLUDE-GROUP] [--stop-on-failure] [--log-junit LOG-JUNIT] [--colors] [--testsuite [TESTSUITE]] [--path PATH] [--] [<path>]
 
 Arguments:
- path                  The path to a directory or file containing tests. (default: current directory)
-
-Options:
- --processes (-p)      The number of test processes to run. (default: 5)
- --functional (-f)     Run methods instead of suites in separate processes.
- --no-test-tokens      Disable TEST_TOKEN environment variables. (default: variable is set)
- --help (-h)           Display this help message.
- --coverage-clover     Generate code coverage report in Clover XML format.
- --coverage-html       Generate code coverage report in HTML format.
- --coverage-php        Serialize PHP_CodeCoverage object to file.
- --max-batch-size (-m) Max batch size (only for functional mode). (default: 0)
- --filter              Filter (only for functional mode).
- --phpunit             The PHPUnit binary to execute. (default: vendor/bin/phpunit)
- --runner              Runner, WrapperRunner or SqliteRunner. (default: Runner)
- --bootstrap           The bootstrap file to be used by PHPUnit.
- --configuration (-c)  The PHPUnit configuration file to use.
- --group (-g)          Only runs tests from the specified group(s).
- --exclude-group       Don't run tests from the specified group(s).
- --stop-on-failure     Don't start any more processes after a failure.
- --log-junit           Log test execution in JUnit XML format to file.
- --colors              Displays a colored bar as a test result.
- --testsuite           Filter which testsuite to run
- --path                An alias for the path argument.
-
+ path                        The path to a directory or file containing tests. (default: current directory)
+      
+Options:      
+ --processes (-p)            The number of test processes to run. (Default: auto)
+                             Possible values:
+                             - Integer (>= 1): Number of processes to run.
+                             - auto (default): Number of processes is automatically set to the number of logical CPU cores.
+                             - half: Number of processes is automatically set to half the number of logical CPU cores.
+ --functional (-f)           Run test methods instead of classes in separate processes.
+ --no-test-tokens            Disable TEST_TOKEN environment variables. (Default: Variable is set)
+ --help (-h)                 Display this help message.
+ --coverage-clover           Generate code coverage report in Clover XML format.
+ --coverage-html             Generate code coverage report in HTML format.
+ --coverage-php              Serialize PHP_CodeCoverage object to file.
+ --coverage-text             Generate code coverage report in text format.
+ --coverage-xml              Generate code coverage report in PHPUnit XML format.
+ --max-batch-size (-m)       Max batch size (only for functional mode). (Default: 0)
+ --filter                    Filter (only for functional mode).
+ --phpunit                   The PHPUnit binary to execute. (Default: vendor/bin/phpunit)
+ --runner                    Runner, WrapperRunner or SqliteRunner. (Default: Runner)
+ --bootstrap                 The bootstrap file to be used by PHPUnit.
+ --configuration (-c)        The PHPUnit configuration file to use.
+ --group (-g)                Only runs tests from the specified group(s).
+ --exclude-group             Don't run tests from the specified group(s).
+ --stop-on-failure           Don't start any more processes after a failure.
+ --log-junit                 Log test execution in JUnit XML format to file.
+ --colors                    Displays a colored bar as a test result.
+ --testsuite                 Filter which testsuite to run. Run multiple suits by separating them with ",". Example:  --testsuite suite1,suite2
+ --path                      An alias for the path argument.
+ --parallel-suite            Run testsuites in parallel as opposed to running test classes / test functions in parallel.
+ --passthru=PASSTHRU         Pass the given arguments verbatim to the underlying test framework. Example: --passthru="'--prepend' 'xdebug-filter.php'"
+ --passthru-php=PASSTHRU-PHP Pass the given arguments verbatim to the underlying php process. Example: --passthru-php="'-d' 'zend_extension=xdebug.so'"
+  -v, --verbose=VERBOSE      If given, debug output is printed. Example: --verbose=1
+ 
 ```
 
-### Optimizing Speed ###
+### Optimizing Speed
 
 To get the most out of paratest, you have to adjust the parameters carefully.
 
  1. **Adjust the number of processes with `-p`**
 
-    To allow full usage of your cpu cores, you should have at least one process per core. More processes allow better resource usage but keep in mind that each process has it's own costs for spawning.
+    To allow full usage of your cpu cores, you should have at least one process per core. More processes allow better resource usage but keep in mind that each process has its own costs for spawning. The default is auto, which means the number of logical CPU cores is set as number of processes. You might try something like logical `CPU cores * 2` (e.g. if you have 8 logical cores, you might try `16`), but keep in mind that each process generates a little bit of overhead as well.
 
  2. **Choose between per-testcase- and per-testmethod-parallelization with `-f`**
 
@@ -104,8 +109,7 @@ To get the most out of paratest, you have to adjust the parameters carefully.
     Decrease max batch size to reduce command line length.
     Windows has limit around 32k, Linux - 2048k, Mac OS X - 256k.
 
-### Examples ###
-
+### Examples
 Examples assume your tests are located under `./test/unit`.
 
 ```
@@ -116,11 +120,48 @@ vendor/bin/paratest -p8 test/unit
 ```
 # Run all unit tests in 4 parallel processes with WrapperRunner and output html code coverage report to /tmp/coverage
 # (Code coverage requires Xdebug to be installed)
-vendor/bin/paratest -p8 --runner=WrapperRunner --coverage-html=/tmp/coverage test/unit
+vendor/bin/paratest -p4 --runner=WrapperRunner --coverage-html=/tmp/coverage test/unit
 ```
 
+### Troubleshooting
+If you run into problems with `paratest`, try to get more information about the issue by enabling debug output via `--verbose=1`.
 
-### Windows ###
+In case you are using the `WrapperRunner` for execution, consider enabling logging for troubleshooting via `export PT_LOGGING_ENABLE="true"`.
+The corresponding logfiles are placed in your `sys_get_temp_dir()`.
+
+See [Logging docs](docs/logging.md) for further information.
+
+### Generating code coverage
+Examples assume your tests are located under `./test/unit`.
+````
+vendor/bin/paratest -p 1 --coverage-text test/unit
+
+Running phpunit in 1 process with /codebase/paratest/vendor/phpunit/phpunit/phpunit
+
+Configuration read from /codebase/paratest/phpunit.xml.dist
+
+...............................................................  63 / 155 ( 40%)
+............................................................... 126 / 157 ( 80%)
+.....................................
+
+Time: 27.2 seconds, Memory: 8.00MB
+
+OK (163 tests, 328 assertions)
+
+
+Code Coverage Report:
+  2019-01-25 09:41:26
+
+ Summary:
+  Classes: 22.86% (8/35)
+  Methods: 49.47% (139/281)
+  Lines:   59.38% (896/1509)
+````
+
+**Caution**: Generating coverage is an art in itself. Please refer to our extensive guide on setting up everything correctly for 
+[code coverage generation with `paratest`](docs/code-coverage.md).
+
+### Windows
 
 Windows users be sure to use the appropriate batch files.
 
@@ -133,8 +174,7 @@ ParaTest assumes [PSR-0](https://github.com/php-fig/fig-standards/blob/master/ac
 For convenience paratest windows version use 79 columns mode to prevent blank lines in standard
 80x25 windows console.
 
-PHPUnit Xml Config Support
---------------------------
+# PHPUnit Xml Config Support
 
 When running PHPUnit tests, ParaTest will automatically pass the phpunit.xml or phpunit.xml.dist to the phpunit runner
 via the --configuration switch. ParaTest also allows the configuration path to be specified manually.
@@ -164,8 +204,7 @@ The following phpunit config file is used for ParaTest's test cases.
 </phpunit>
 ```
 
-Test token
-----------
+# Test token
 
 The `TEST_TOKEN` environment variable is guaranteed to have a value that is different
 from every other currently running test. This is useful to e.g. use a different database
@@ -179,27 +218,41 @@ if (getenv('TEST_TOKEN') !== false) {  // Using paratest
 }
 ```
 
-For Contributors: Testing paratest itself
--------------
+# For Contributors: Testing paratest itself
 
 ParaTest's test suite depends on PHPUnit being installed via composer. Make sure you run `composer install` after cloning.
 
-**Note that The `display_errors` php.ini directive must be set to `stderr` to run
-the test suite.**
+**Note that The `display_errors` php.ini directive must be set to `stderr` to run the test suite.**
+
+You can use composer scripts for convenient access to style checks and tests. Run `compose run-script -l` to list the
+available commands:
+
+````
+composer run-script -l
+scripts:
+  style            Run style checks (only dry run - no fixing!)
+  style-fix        Run style checks and fix violations
+  test             Run all tests
+  test-unit        Run only unit tests
+  test-functional  Run only functional tests
+  test-paratest    Run all tests with paratest itself
+````
 
 To run unit tests:
-`vendor/bin/phpunit test/unit`
+`composer test-unit` OR `vendor/bin/phpunit test/unit`
 
 To run functional tests:
-`vendor/bin/phpunit test/functional`
+`composer test-functional` OR `vendor/bin/phpunit test/functional`
 
-You can run all tests at once by running phpunit from the project directory.
-`vendor/bin/phpunit`
+You can run all tests at once by running phpunit from the project directory:
+`composer test` OR `vendor/bin/phpunit`
 
-ParaTest can run its own test suite by running it from the `bin` directory.
-`bin/paratest`
+ParaTest can run its own test suite by running it from the `bin` directory:
+`composer test` OR `bin/paratest`
 
-Before creating a Pull Request be sure to run `vendor/bin/php-cs-fixer fix` and
-commit the eventual changes.
+Before creating a Pull Request be sure to run the style checks and commit the eventual changes:
+`composer style-fix` OR `vendor/bin/php-cs-fixer fix`
+
+Use `composer style` to only show violations without fixing.
 
 For an example of ParaTest out in the wild check out the [example](https://github.com/brianium/paratest-selenium).

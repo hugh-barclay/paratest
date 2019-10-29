@@ -26,7 +26,7 @@ abstract class MetaProvider
      *
      * @var string
      */
-    protected static $messageMethod = '/^get((Failure|Error)s)$/';
+    protected static $messageMethod = '/^get((Failure|Error|Warning)s)$/';
 
     /**
      * Simplify aggregation of totals or messages.
@@ -54,8 +54,8 @@ abstract class MetaProvider
     protected function getNumericValue(string $property)
     {
         return ($property === 'time')
-            ? (float) ($this->suites[0]->$property)
-            : (int) ($this->suites[0]->$property);
+            ? (float) $this->suites[0]->$property
+            : (int) $this->suites[0]->$property;
     }
 
     /**

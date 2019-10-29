@@ -49,7 +49,9 @@ class Parser
         try {
             $this->refl = new \ReflectionClass($class);
         } catch (\ReflectionException $e) {
-            throw new \InvalidArgumentException('Unable to instantiate ReflectionClass. ' . $class . ' not found in: ' . $srcPath);
+            throw new \InvalidArgumentException(
+                'Unable to instantiate ReflectionClass. ' . $class . ' not found in: ' . $srcPath
+            );
         }
     }
 
@@ -57,11 +59,11 @@ class Parser
      * Returns the fully constructed class
      * with methods or null if the class is abstract.
      *
-     * @return null|ParsedClass
+     * @return ParsedClass|null
      */
     public function getClass()
     {
-        return ($this->refl->isAbstract())
+        return $this->refl->isAbstract()
             ? null
             : new ParsedClass(
                 (string) $this->refl->getDocComment(),
@@ -118,12 +120,12 @@ class Parser
         $classes = get_declared_classes();
         $newClasses = array_values(array_diff($classes, $previousDeclaredClasses));
 
-        $className = $this->_searchForUnitTestClass($newClasses, $filename);
+        $className = $this->searchForUnitTestClass($newClasses, $filename);
         if (isset($className)) {
             return $className;
         }
 
-        $className = $this->_searchForUnitTestClass($classes, $filename);
+        $className = $this->searchForUnitTestClass($classes, $filename);
         if (isset($className)) {
             return $className;
         }
@@ -137,7 +139,7 @@ class Parser
      *
      * @return string|null
      */
-    private function _searchForUnitTestClass(array $classes, string $filename)
+    private function searchForUnitTestClass(array $classes, string $filename)
     {
         // TODO: After merging this PR or other PR for phpunit 6 support, keep only the applicable subclass name
         $matchingClassName = null;

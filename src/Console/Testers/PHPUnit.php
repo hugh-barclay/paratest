@@ -8,6 +8,7 @@ use InvalidArgumentException;
 use ParaTest\Runners\PHPUnit\BaseRunner;
 use ParaTest\Runners\PHPUnit\Configuration;
 use ParaTest\Runners\PHPUnit\Runner;
+use ParaTest\Util\Str;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -22,6 +23,12 @@ use Symfony\Component\Console\Output\OutputInterface;
 class PHPUnit extends Tester
 {
     /**
+     * @see \PHPUnit\Util\Configuration
+     * @see https://github.com/sebastianbergmann/phpunit/commit/80754cf323fe96003a2567f5e57404fddecff3bf
+     */
+    private const TEST_SUITE_FILTER_SEPARATOR = ',';
+
+    /**
      * @var \ParaTest\Console\Commands\ParaTestCommand
      */
     protected $command;
@@ -35,18 +42,48 @@ class PHPUnit extends Tester
     public function configure(Command $command)
     {
         $command
-            ->addOption('phpunit', null, InputOption::VALUE_REQUIRED, 'The PHPUnit binary to execute. <comment>(default: vendor/bin/phpunit)</comment>')
-            ->addOption('runner', null, InputOption::VALUE_REQUIRED, 'Runner, WrapperRunner or SqliteRunner. <comment>(default: Runner)</comment>')
+            ->addOption(
+                'phpunit',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'The PHPUnit binary to execute. <comment>(default: vendor/bin/phpunit)</comment>'
+            )
+            ->addOption(
+                'runner',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Runner, WrapperRunner or SqliteRunner. <comment>(default: Runner)</comment>'
+            )
             ->addOption('bootstrap', null, InputOption::VALUE_REQUIRED, 'The bootstrap file to be used by PHPUnit.')
             ->addOption('configuration', 'c', InputOption::VALUE_REQUIRED, 'The PHPUnit configuration file to use.')
             ->addOption('group', 'g', InputOption::VALUE_REQUIRED, 'Only runs tests from the specified group(s).')
-            ->addOption('exclude-group', null, InputOption::VALUE_REQUIRED, 'Don\'t run tests from the specified group(s).')
-            ->addOption('stop-on-failure', null, InputOption::VALUE_NONE, 'Don\'t start any more processes after a failure.')
-            ->addOption('log-junit', null, InputOption::VALUE_REQUIRED, 'Log test execution in JUnit XML format to file.')
+            ->addOption(
+                'exclude-group',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Don\'t run tests from the specified group(s).'
+            )
+            ->addOption(
+                'stop-on-failure',
+                null,
+                InputOption::VALUE_NONE,
+                'Don\'t start any more processes after a failure.'
+            )
+            ->addOption(
+                'log-junit',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Log test execution in JUnit XML format to file.'
+            )
             ->addOption('colors', null, InputOption::VALUE_NONE, 'Displays a colored bar as a test result.')
             ->addOption('testsuite', null, InputOption::VALUE_OPTIONAL, 'Filter which testsuite to run')
-            ->addArgument('path', InputArgument::OPTIONAL, 'The path to a directory or file containing tests. <comment>(default: current directory)</comment>')
-            ->addOption('path', null, InputOption::VALUE_REQUIRED, 'An alias for the path argument.');
+            ->addArgument(
+                'path',
+                InputArgument::OPTIONAL,
+                'The path to a directory or file containing tests. <comment>(default: current directory)</comment>'
+            )
+            ->addOption('path', null, InputOption::VALUE_REQUIRED, 'An alias for the path argument.')
+        ;
         $this->command = $command;
     }
 
@@ -107,7 +144,7 @@ class PHPUnit extends Tester
      */
     protected function getConfig(InputInterface $input)
     {
-        $cwd = getcwd() . DIRECTORY_SEPARATOR;
+        $cwd = getcwd() . \DIRECTORY_SEPARATOR;
 
         if ($input->getOption('configuration')) {
             $configFilename = $input->getOption('configuration');
@@ -142,6 +179,13 @@ class PHPUnit extends Tester
 
         if ($path) {
             $options = array_merge(['path' => $path], $options);
+        }
+
+        if (\array_key_exists('testsuite', $options)) {
+            $options['testsuite'] = Str::explodeWithCleanup(
+                self::TEST_SUITE_FILTER_SEPARATOR,
+                $options['testsuite']
+            );
         }
 
         return $options;
@@ -192,7 +236,9 @@ class PHPUnit extends Tester
      */
     protected function hasCoverage(array $options): bool
     {
-        $isFileFormat = isset($options['coverage-html']) || isset($options['coverage-clover']);
+        $isFileFormat = isset($options['coverage-html'])
+            || isset($options['coverage-clover'])
+            || isset($options['coverage-xml']);
         $isTextFormat = isset($options['coverage-text']);
         $isPHP = isset($options['coverage-php']);
 
@@ -220,14 +266,15 @@ class PHPUnit extends Tester
         $config = $this->getConfig($input);
         $bootstrap = $config->getBootstrap();
 
-        return ($bootstrap) ? $config->getConfigDir() . $bootstrap : '';
+        return $bootstrap ? $config->getConfigDir() . $bootstrap : '';
     }
 
     private function initializeRunner(InputInterface $input): BaseRunner
     {
         if ($input->getOption('runner')) {
             $runnerClass = $input->getOption('runner') ?: '';
-            $runnerClass = class_exists($runnerClass) ? $runnerClass : ('\\ParaTest\\Runners\\PHPUnit\\' . $runnerClass);
+            $runnerClass = class_exists($runnerClass) ?
+                $runnerClass : ('\\ParaTest\\Runners\\PHPUnit\\' . $runnerClass);
         } else {
             $runnerClass = Runner::class;
         }

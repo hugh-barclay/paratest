@@ -10,8 +10,6 @@ use ParaTest\Logging\LogInterpreter;
 
 abstract class BaseRunner
 {
-    const PHPUNIT_FATAL_ERROR = 255;
-
     /**
      * @var Options
      */
@@ -39,7 +37,7 @@ abstract class BaseRunner
      * A collection of ExecutableTest objects that have processes
      * currently running.
      *
-     * @var array
+     * @var array|ExecutableTest[]
      */
     protected $running = [];
 
@@ -77,7 +75,10 @@ abstract class BaseRunner
      */
     protected function verifyConfiguration()
     {
-        if (isset($this->options->filtered['configuration']) && !file_exists($this->options->filtered['configuration']->getPath())) {
+        if (
+            isset($this->options->filtered['configuration']) &&
+            !file_exists($this->options->filtered['configuration']->getPath())
+        ) {
             $this->printer->println(sprintf('Could not read "%s".', $this->options->filtered['configuration']));
             exit(1);
         }
@@ -147,6 +148,10 @@ abstract class BaseRunner
             $reporter->text();
         }
 
+        if (isset($filteredOptions['coverage-xml'])) {
+            $reporter->xml($filteredOptions['coverage-xml']);
+        }
+
         $reporter->php($filteredOptions['coverage-php']);
     }
 
@@ -155,7 +160,7 @@ abstract class BaseRunner
         if (!isset($this->options->filtered['coverage-php'])) {
             return;
         }
-        $this->coverage = new CoverageMerger();
+        $this->coverage = new CoverageMerger((int)$this->options->coverageTestLimit);
     }
 
     /**
@@ -174,9 +179,28 @@ abstract class BaseRunner
         return $this->coverage;
     }
 
+    /**
+     * Overrides envirenment variables if needed.
+     */
+    protected function overrideEnvironmentVariables()
+    {
+        if (!isset($this->options->filtered['configuration'])) {
+            return;
+        }
+
+        $variables = $this->options->filtered['configuration']->getEnvironmentVariables();
+
+        foreach ($variables as $key => $value) {
+            putenv(sprintf('%s=%s', $key, $value));
+
+            $_ENV[$key] = $value;
+        }
+    }
+
     protected function initialize(): void
     {
         $this->verifyConfiguration();
+        $this->overrideEnvironmentVariables();
         $this->initCoverage();
         $this->load(new SuiteLoader($this->options));
         $this->printer->start($this->options);

@@ -10,12 +10,12 @@ class TestFileLoader
      * The pattern used for grabbing test files. Uses the *Test.php convention
      * that PHPUnit defaults to.
      */
-    const TEST_PATTERN = '/.+Test\.php$/';
+    private const TEST_PATTERN = '/.+Test\.php$/';
 
     /**
      * Matches php files.
      */
-    const FILE_PATTERN = '/.+\.php$/';
+    private const FILE_PATTERN = '/.+\.php$/';
 
     /**
      * Used to ignore directory paths '.' and '..'.
@@ -92,8 +92,14 @@ class TestFileLoader
     public function loadPath(string $path, string $pattern = null): array
     {
         $this->files = [];
+
+        $pattern = $pattern ?? self::TEST_PATTERN;
+
         $path = $path ?: $this->options->path;
-        $pattern = null === $pattern ? self::TEST_PATTERN : $pattern;
+        if ($path instanceof SuitePath) {
+            $pattern = $path->getPattern();
+            $path = $path->getPath();
+        }
 
         if (!file_exists($path)) {
             throw new \InvalidArgumentException("$path is not a valid directory or file");
@@ -117,7 +123,7 @@ class TestFileLoader
     {
         $files = scandir($path);
         foreach ($files as $file) {
-            $this->tryLoadTests($path . DIRECTORY_SEPARATOR . $file, $pattern);
+            $this->tryLoadTests($path . \DIRECTORY_SEPARATOR . $file, $pattern);
         }
     }
 
@@ -142,7 +148,7 @@ class TestFileLoader
         if (preg_match($pattern, $path)) {
             if ($this->excludingFiles) {
                 $this->excludedFiles[$path] = $path;
-            } elseif (!array_key_exists($path, $this->excludedFiles)) {
+            } elseif (!\array_key_exists($path, $this->excludedFiles)) {
                 $this->files[] = $path;
             }
         }

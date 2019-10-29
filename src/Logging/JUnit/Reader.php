@@ -19,7 +19,7 @@ class Reader extends MetaProvider
     protected $isSingle = false;
 
     /**
-     * @var array
+     * @var TestSuite[]
      */
     protected $suites = [];
 
@@ -50,7 +50,9 @@ class Reader extends MetaProvider
 
         $this->logFile = $logFile;
         if (filesize($logFile) === 0) {
-            throw new \InvalidArgumentException("Log file $logFile is empty. This means a PHPUnit process has crashed.");
+            throw new \InvalidArgumentException(
+                "Log file $logFile is empty. This means a PHPUnit process has crashed."
+            );
         }
         $logFileContents = file_get_contents($this->logFile);
         $this->xml = new \SimpleXMLElement($logFileContents);
@@ -101,6 +103,8 @@ class Reader extends MetaProvider
                     $feedback[] = 'E';
                 } elseif ($case->skipped) {
                     $feedback[] = 'S';
+                } elseif ($case->warnings) {
+                    $feedback[] = 'W';
                 } else {
                     $feedback[] = '.';
                 }
@@ -143,7 +147,8 @@ class Reader extends MetaProvider
         if (!$this->isSingle) {
             $this->addSuite($properties, $testCases);
         } else {
-            $this->suites[0]->cases = $testCases;
+            $suite = $this->suites[0];
+            $suite->cases = array_merge($suite->cases, $testCases);
         }
     }
 
@@ -174,15 +179,15 @@ class Reader extends MetaProvider
         $cb = [TestCase::class, 'caseFromNode'];
 
         return array_reduce($nodeArray, function ($result, $c) use (&$testCases, $cb) {
-            $testCases[] = call_user_func_array($cb, [$c]);
+            $testCases[] = \call_user_func_array($cb, [$c]);
             $result['name'] = (string) $c['class'];
             $result['file'] = (string) $c['file'];
-            $result['tests'] = $result['tests'] + 1;
+            ++$result['tests'];
             $result['assertions'] += (int) $c['assertions'];
-            $result['failures'] += count($c->xpath('failure'));
-            $result['errors'] += count($c->xpath('error'));
-            $result['skipped'] += count($c->xpath('skipped'));
-            $result['time'] += (float) ($c['time']);
+            $result['failures'] += \count($c->xpath('failure'));
+            $result['errors'] += \count($c->xpath('error'));
+            $result['skipped'] += \count($c->xpath('skipped'));
+            $result['time'] += (float) $c['time'];
 
             return $result;
         }, static::$defaultSuite);
@@ -199,11 +204,11 @@ class Reader extends MetaProvider
         $caseNodes = $this->xml->xpath('//testcase');
         $cases = [];
         foreach ($caseNodes as $node) {
-            $case = $node;
-            if (!isset($cases[(string) $node['file']])) {
-                $cases[(string) $node['file']] = [];
+            $caseFilename = (string) $node['file'];
+            if (!isset($cases[$caseFilename])) {
+                $cases[$caseFilename] = [];
             }
-            $cases[(string) $node['file']][] = $node;
+            $cases[$caseFilename][] = $node;
         }
 
         return $cases;
@@ -217,7 +222,7 @@ class Reader extends MetaProvider
     protected function initSuite()
     {
         $suiteNodes = $this->xml->xpath('/testsuites/testsuite/testsuite');
-        $this->isSingle = count($suiteNodes) === 0;
+        $this->isSingle = \count($suiteNodes) === 0;
         $node = current($this->xml->xpath('/testsuites/testsuite'));
 
         if ($node !== false) {

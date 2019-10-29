@@ -1,0 +1,22 @@
+{
+    "compactors": [
+        "KevinGH\\Box\\Compactor\\Json",
+        "KevinGH\\Box\\Compactor\\Php"
+    ],
+    "directories": [
+        "src"
+    ],
+    "finder": [
+        {
+            "name": "*.php",
+            "exclude": [
+                "friendsofphp"
+            ],
+            "in": "vendor"
+        }
+    ],
+    "files": [
+        "LICENSE"
+    ],
+    "git-version": "git-version"
+}

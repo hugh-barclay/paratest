@@ -1,5 +1,8 @@
 <?php
 
+/**
+ * @group group4
+ */
 class GroupsTest extends PHPUnit\FrameWork\TestCase
 {
     /**
@@ -33,7 +36,7 @@ class GroupsTest extends PHPUnit\FrameWork\TestCase
      */
     public function testStringLength()
     {
-        $string = "hello";
+        $string = 'hello';
         $this->assertEquals(5, strlen($string));
     }
 

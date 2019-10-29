@@ -32,7 +32,7 @@ class DataProviderTest extends \PHPUnit\Framework\TestCase
     {
         $result = [];
         for ($i = 0; $i < 50; $i++) {
-            $name = "name_of_test_" . $i;
+            $name = 'name_of_test_' . $i;
             $result[$name] = [$i, $i];
         }
 
@@ -55,5 +55,18 @@ class DataProviderTest extends \PHPUnit\Framework\TestCase
         }
 
         return $result;
+    }
+
+    /**
+     * @dataProvider dataProviderIterable
+     */
+    public function testIterableDataProvider($expected, $actual)
+    {
+        $this->assertEquals($expected, $actual);
+    }
+
+    public function dataProviderIterable(): iterable
+    {
+        yield from $this->dataProviderNumeric50();
     }
 }

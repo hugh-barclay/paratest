@@ -8,8 +8,9 @@ use ParaTest\Runners\PHPUnit\Worker\WrapperWorker;
 
 class WrapperRunner extends BaseRunner
 {
-    const PHPUNIT_FAILURES = 1;
-    const PHPUNIT_ERRORS = 2;
+    private const PHPUNIT_FAILURES = 1;
+
+    private const PHPUNIT_ERRORS = 2;
 
     /**
      * @var array
@@ -40,7 +41,10 @@ class WrapperRunner extends BaseRunner
     protected function load(SuiteLoader $loader)
     {
         if ($this->options->functional) {
-            throw new \RuntimeException('The `functional` option is not supported yet in the WrapperRunner. Only full classes can be run due to the current PHPUnit commands causing classloading issues.');
+            throw new \RuntimeException(
+                'The `functional` option is not supported yet in the WrapperRunner. Only full classes can be run due ' .
+                    'to the current PHPUnit commands causing classloading issues.'
+            );
         }
         parent::load($loader);
     }
@@ -57,7 +61,7 @@ class WrapperRunner extends BaseRunner
                 $token = $i;
                 $uniqueToken = uniqid();
             }
-            $worker->start($wrapper, $token, $uniqueToken);
+            $worker->start($wrapper, $token, $uniqueToken, [], $this->options);
             $this->streams[] = $worker->stdout();
             $this->workers[] = $worker;
         }
@@ -68,14 +72,23 @@ class WrapperRunner extends BaseRunner
         $phpunit = $this->options->phpunit;
         $phpunitOptions = $this->options->filtered;
         // $phpunitOptions['no-globals-backup'] = null;  // removed in phpunit 6.0
-        while (count($this->pending)) {
+        while (\count($this->pending)) {
             $this->waitForStreamsToChange($this->streams);
-            foreach ($this->progressedWorkers() as $worker) {
+            foreach ($this->progressedWorkers() as $key => $worker) {
                 if ($worker->isFree()) {
-                    $this->flushWorker($worker);
-                    $pending = array_shift($this->pending);
-                    if ($pending) {
-                        $worker->assign($pending, $phpunit, $phpunitOptions);
+                    try {
+                        $this->flushWorker($worker);
+                        $pending = array_shift($this->pending);
+                        if ($pending) {
+                            $worker->assign($pending, $phpunit, $phpunitOptions, $this->options);
+                        }
+                    } catch (\Exception $e) {
+                        if ($this->options->verbose) {
+                            $worker->stop();
+                            echo "Error while assigning pending tests for worker $key: {$e->getMessage()}" . PHP_EOL;
+                            echo $worker->getCrashReport();
+                        }
+                        throw $e;
                     }
                 }
             }
@@ -92,13 +105,23 @@ class WrapperRunner extends BaseRunner
     private function waitForAllToFinish()
     {
         $toStop = $this->workers;
-        while (count($toStop) > 0) {
+        while (\count($toStop) > 0) {
             $toCheck = $this->streamsOf($toStop);
             $new = $this->waitForStreamsToChange($toCheck);
             foreach ($this->progressedWorkers() as $index => $worker) {
-                if (!$worker->isRunning()) {
-                    $this->flushWorker($worker);
-                    unset($toStop[$index]);
+                try {
+                    if (!$worker->isRunning()) {
+                        $this->flushWorker($worker);
+                        unset($toStop[$index]);
+                    }
+                } catch (\Exception $e) {
+                    if ($this->options->verbose) {
+                        $worker->stop();
+                        unset($toStop[$index]);
+                        echo "Error while waiting to finish for worker $index: {$e->getMessage()}" . PHP_EOL;
+                        echo $worker->getCrashReport();
+                    }
+                    throw $e;
                 }
             }
         }

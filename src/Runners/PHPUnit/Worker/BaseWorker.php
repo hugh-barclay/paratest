@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ParaTest\Runners\PHPUnit\Worker;
 
+use ParaTest\Runners\PHPUnit\Options;
 use Symfony\Component\Process\PhpExecutableFinder;
 
 abstract class BaseWorker
@@ -20,23 +21,37 @@ abstract class BaseWorker
     private $chunks = '';
     private $alreadyReadOutput = '';
 
-    public function start(string $wrapperBinary, $token = 1, $uniqueToken = null, array $parameters = [])
-    {
+    public function start(
+        string $wrapperBinary,
+        $token = 1,
+        $uniqueToken = null,
+        array $parameters = [],
+        ?Options $options = null
+    ) {
         $bin = 'PARATEST=1 ';
         if (is_numeric($token)) {
+            $bin .= 'XDEBUG_CONFIG="true" ';
             $bin .= "TEST_TOKEN=$token ";
         }
         if ($uniqueToken) {
             $bin .= "UNIQUE_TEST_TOKEN=$uniqueToken ";
         }
         $finder = new PhpExecutableFinder();
-        $bin .= $finder->find() . " \"$wrapperBinary\"";
+        $phpExecutable = $finder->find();
+        $bin .= "$phpExecutable ";
+        if ($options && $options->passthruPhp) {
+            $bin .= $options->passthruPhp . ' ';
+        }
+        $bin .= " \"$wrapperBinary\"";
         if ($parameters) {
             $bin .= ' ' . implode(' ', array_map('escapeshellarg', $parameters));
         }
         $pipes = [];
+        if ($options && $options->verbose) {
+            echo "Starting WrapperWorker via: $bin\n";
+        }
         $process = proc_open($bin, self::$descriptorspec, $pipes);
-        $this->proc = is_resource($process) ? $process : null;
+        $this->proc = \is_resource($process) ? $process : null;
         $this->pipes = $pipes;
     }
 
@@ -84,16 +99,20 @@ abstract class BaseWorker
     public function checkNotCrashed()
     {
         if ($this->isCrashed()) {
-            $lastCommand = isset($this->commands) ? ' Last executed command: ' . end($this->commands) : '';
-            throw new \RuntimeException(
-                'This worker has crashed.' . $lastCommand . PHP_EOL
-                . 'Output:' . PHP_EOL
-                . '----------------------' . PHP_EOL
-                . $this->alreadyReadOutput . PHP_EOL
-                . '----------------------' . PHP_EOL
-                . $this->readAllStderr()
-            );
+            throw new \RuntimeException($this->getCrashReport());
         }
+    }
+
+    public function getCrashReport()
+    {
+        $lastCommand = isset($this->commands) ? ' Last executed command: ' . end($this->commands) : '';
+
+        return 'This worker has crashed.' . $lastCommand . PHP_EOL
+            . 'Output:' . PHP_EOL
+            . '----------------------' . PHP_EOL
+            . $this->alreadyReadOutput . PHP_EOL
+            . '----------------------' . PHP_EOL
+            . $this->readAllStderr();
     }
 
     public function stop()
@@ -131,8 +150,8 @@ abstract class BaseWorker
             $lines = explode("\n", $this->chunks);
             // last element is not a complete line,
             // becomes part of a line completed later
-            $this->chunks = $lines[count($lines) - 1];
-            unset($lines[count($lines) - 1]);
+            $this->chunks = $lines[\count($lines) - 1];
+            unset($lines[\count($lines) - 1]);
             // delivering complete lines to this Worker
             foreach ($lines as $line) {
                 $line .= "\n";

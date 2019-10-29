@@ -14,7 +14,8 @@ use Symfony\Component\Process\Process;
  */
 final class VersionProvider
 {
-    const PACKAGE = 'brianium/paratest';
+    private const PACKAGE = 'brianium/paratest';
+
     /**
      * @var null
      */
@@ -41,15 +42,16 @@ final class VersionProvider
 
     public function getGitVersion()
     {
-        $version = null;
+        $cmd = 'git describe --tags --always --first-parent';
+        $process = method_exists(Process::class, 'fromShellCommandline') ?
+            Process::fromShellCommandline($cmd, __DIR__) :
+            new Process($cmd, __DIR__);
 
-        $process = new Process('git describe --tags --always --first-parent', __DIR__);
         if ($process->run() !== 0) {
-            return;
+            return null;
         }
-        $version = trim($process->getOutput());
 
-        return $version;
+        return trim($process->getOutput());
     }
 
     public function getComposerInstalledVersion($package)
@@ -64,12 +66,12 @@ final class VersionProvider
         }
 
         $struct = json_decode($result, true, 16);
-        if (!is_array($struct)) {
+        if (!\is_array($struct)) {
             return;
         }
 
         foreach ($struct as $entry) {
-            if (!is_array($entry)) {
+            if (!\is_array($entry)) {
                 continue;
             }
             $name = $entry['name'] ?? null;

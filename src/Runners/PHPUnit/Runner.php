@@ -8,6 +8,8 @@ use Habitat\Habitat;
 
 class Runner extends BaseRunner
 {
+    private const PHPUNIT_FATAL_ERROR = 255;
+
     /**
      * A collection of available tokens based on the number
      * of processes specified in $options.
@@ -29,11 +31,21 @@ class Runner extends BaseRunner
     {
         parent::run();
 
-        while (count($this->running) || count($this->pending)) {
+        while (\count($this->running) || \count($this->pending)) {
             foreach ($this->running as $key => $test) {
-                if (!$this->testIsStillRunning($test)) {
-                    unset($this->running[$key]);
-                    $this->releaseToken($key);
+                try {
+                    if (!$this->testIsStillRunning($test)) {
+                        unset($this->running[$key]);
+                        $this->releaseToken($key);
+                    }
+                } catch (\Exception $e) {
+                    if ($this->options->verbose) {
+                        echo "An error for $key: {$e->getMessage()}" . PHP_EOL;
+                        echo "Command: {$test->getLastCommand()}" . PHP_EOL;
+                        echo 'StdErr: ' . $test->getStderr() . PHP_EOL;
+                        echo 'StdOut: ' . $test->getStdout() . PHP_EOL;
+                    }
+                    throw $e;
                 }
             }
             $this->fillRunQueue();
@@ -68,12 +80,20 @@ class Runner extends BaseRunner
     private function fillRunQueue()
     {
         $opts = $this->options;
-        while (count($this->pending) && count($this->running) < $opts->processes) {
+        while (\count($this->pending) && \count($this->running) < $opts->processes) {
             $tokenData = $this->getNextAvailableToken();
             if ($tokenData !== false) {
                 $this->acquireToken($tokenData['token']);
-                $env = ['TEST_TOKEN' => $tokenData['token'], 'UNIQUE_TEST_TOKEN' => $tokenData['unique']] + Habitat::getAll();
-                $this->running[$tokenData['token']] = array_shift($this->pending)->run($opts->phpunit, $opts->filtered, $env);
+                $env = [
+                    'TEST_TOKEN' => $tokenData['token'],
+                    'UNIQUE_TEST_TOKEN' => $tokenData['unique']
+                ] + Habitat::getAll();
+                $this->running[$tokenData['token']] = array_shift($this->pending)
+                    ->run($opts->phpunit, $opts->filtered, $env, $opts->passthru, $opts->passthruPhp);
+                if ($opts->verbose) {
+                    $cmd = $this->running[$tokenData['token']];
+                    echo "\nExecuting test via: {$cmd->getLastCommand()}\n";
+                }
             }
         }
     }
@@ -105,7 +125,7 @@ class Runner extends BaseRunner
             if (!$errorOutput) {
                 $errorOutput = $test->getStdout();
             }
-            throw new \Exception($errorOutput);
+            throw new \Exception(sprintf("Fatal error in %s:\n%s", $test->getPath(), $errorOutput));
         }
         $this->printer->printFeedback($test);
         if ($this->hasCoverage()) {
